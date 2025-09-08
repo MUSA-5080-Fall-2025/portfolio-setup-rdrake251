@@ -4,20 +4,20 @@ date: "2025-09-08"
 ---
 
 ## Key Concepts Learned
-- [List main concepts from lecture]
-- [Technical skills covered]
+- [Good review of RStudio and introdution to GitHub.]
+- [Working on proper set up of 'reno' which is short for repository.]
 
 ## Coding Techniques
-- [New R functions or approaches]
-- [Quarto features learned]
+- [Connected to GitHub]
+- [Connected to RStudio]
 
 ## Questions & Challenges
-- [What I didn't fully understand]
-- [Areas needing more practice]
+- [I am still playing with this all. So far so good.]
+- [We will see if I get my website running!]
 
 ## Connections to Policy
-- [How this week's content applies to real policy work]
+- [Set up for proper data analytics makes the work SO much easier.]
 
 ## Reflection
-- [What was most interesting]
-- [How I'll apply this knowledge]
+- [Good intro to GitHub. I am excited and nervous for this course!]
+- [I want to understand modeling and how data affects policy decisions.]
