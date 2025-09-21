@@ -10,9 +10,13 @@ navbar:
       text: Home
     - href: weekly-notes/
       text: Weekly Notes
-    - text: Labs
+      menu: 
+        - href: weekly-notes/week-01-notes.qmb
+          text: Week 1
+    - href: Labs/
+      text: Labs
       menu:
-        - href: labs/lab_0/
+        - href: Labs/lab0/script/data/labs-02.qmb
           text: Lab 0: dplyr Basics
 
 format:
