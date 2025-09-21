@@ -16,7 +16,7 @@ navbar:
     - href: Labs/
       text: Labs
       menu:
-        - href: Labs/lab0/script/data/labs-02.qmb
+        - href: Labs/lab0/lab0_template.qmb
           text: Lab 0: dplyr Basics
 
 format:
