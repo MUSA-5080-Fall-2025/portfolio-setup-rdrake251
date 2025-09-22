@@ -3,7 +3,7 @@
     "path": "C:/Users/rydra/OneDrive - PennO365/CPLN 5080 Public Policy/portfolio-setup-rdrake251/_quarto.yml",
     "project_path": "_quarto.yml",
     "type": "yaml",
-    "hash": "2788981745",
+    "hash": "888607982",
     "contents": "",
     "dirty": false,
     "created": 1757350771587.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "19,35",
-        "scrollLine": "5"
+        "cursorPosition": "19,7",
+        "scrollLine": "7"
     },
     "folds": "",
-    "lastKnownWriteTime": 1758489361,
+    "lastKnownWriteTime": 1758550663,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1758489361499,
+    "last_content_update": 1758550663669,
     "read_only": false,
     "read_only_alternatives": []
 }
