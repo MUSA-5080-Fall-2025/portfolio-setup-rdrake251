@@ -4,23 +4,26 @@ project:
 
 website:
   title: "Ryan Drake - MUSA 5080 Portfolio"
-navbar:
-  left:
-    - href: index.qmd
-      text: Home
-    - href: weekly-notes/
-      text: Weekly Notes
-      menu: 
-        - href: weekly-notes/week-01-notes.qmd
-          text: Week 1
-        - href: weekly-notes/week-02-notes.qmd
-          text: Week 2
-    - href: Labs/
-      text: Labs
-      menu: 
-        - href: Labs/lab_00/lab0_template.qmd
-          text: Lab 0
-
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: "Weekly Notes"
+        menu: 
+          - href: weekly-notes/
+            text: "All Notes"
+          - href: weekly-notes/week-01-notes.qmd
+            text: "Week1"
+          - href: weekly-notes/week-02-notes.qmd
+            text: "Week2"
+      - text: "Labs"
+        menu:
+          - href: Labs/lab_00/lab0_template.qmd
+            text: "Lab 0: Dplyr Basics"
+      - text: "Assignments"
+        menu:
+          - href: Assignments/assignment_01/assignment1_template.qmd
+            text: "Assignment 1: Census Data Exploration"
 format:
   html:
     theme: cosmo
