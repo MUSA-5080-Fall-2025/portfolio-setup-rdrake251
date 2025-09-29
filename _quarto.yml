@@ -13,9 +13,11 @@ website:
           - href: weekly-notes/
             text: "All Notes"
           - href: weekly-notes/week-01-notes.qmd
-            text: "Week1"
+            text: "Week 1"
           - href: weekly-notes/week-02-notes.qmd
-            text: "Week2"
+            text: "Week 2"
+          - href: weekly-notes/week-03-notes.qmd
+            text: "Week 3"
       - text: "Labs"
         menu:
           - href: Labs/lab_00/lab0_template.qmd

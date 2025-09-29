@@ -1,0 +1,23 @@
+---
+title: "Week 3 Notes - Data Visualisation"
+date: "2025-09-22"
+---
+
+## Key Concepts Learned
+- [algorthim definitions and dplyr basics]
+- [Working on Lab set up? not working so far]
+
+## Coding Techniques
+- [dplyr basics]
+- [getting more comportable with r and git hub relationship]
+
+## Questions & Challenges
+- [weekly notes 2 gmd file to make a new folder on website?]
+- [lab folder set up still not working]
+
+## Connections to Policy
+- [begginings of census data analytics]
+
+## Reflection
+- [i liked the course day structure to practice some coding and then lecture]
+- [still struggling to get website to function properly]

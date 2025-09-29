@@ -1,8 +1,8 @@
 ---
 title: "Assignment 1: Census Data Quality for Policy Decisions"
 subtitle: "Evaluating Data Reliability for Algorithmic Decision-Making"
-author: "Your Name Here"
-date: today
+author: "Ryan Drake"
+date: 09/30/2025
 format: 
   html:
     code-fold: false
@@ -18,7 +18,7 @@ execute:
 
 ## Scenario
 
-You are a data analyst for the **[Your State] Department of Human Services**. The department is considering implementing an algorithmic system to identify communities that should receive priority for social service funding and outreach programs. Your supervisor has asked you to evaluate the quality and reliability of available census data to inform this decision.
+You are a data analyst for the **[Iowa] Department of Human Services**. The department is considering implementing an algorithmic system to identify communities that should receive priority for social service funding and outreach programs. Your supervisor has asked you to evaluate the quality and reliability of available census data to inform this decision.
 
 Drawing on our Week 2 discussion of algorithmic bias, you need to assess not just what the data shows, but how reliable it is and what communities might be affected by data quality issues.
 
@@ -53,12 +53,21 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r setup}
 # Load required packages (hint: you need tidycensus, tidyverse, and knitr)
 
+library(tidycensus)
+library(tidyverse)
+library(knitr)
+
 # Set your Census API key
 
+census_api_key(Sys.getenv("a55638f442ab081818dbf0ae29a32549253a2ab0"))
+
 # Choose your state for analysis - assign it to a variable called my_state
+
+state_choice <- "IA"
+
 ```
 
-**State Selection:** I have chosen **[Your State Name]** for this analysis because: [Brief explanation of why you chose this state]
+**State Selection:** I have chosen **[Iowa]** for this analysis because: [I am interested in rural policy analytics. How is it different than urban. What is often missed in algorithms targeted at rural populations? What are the bias? Data biases? Also I lived there for a few years.]
 
 # Part 2: County-Level Resource Assessment
 
@@ -75,13 +84,76 @@ If there is a special character like comma, you need use double quote mark so th
 
 **Hint:** Remember to give your variables descriptive names using the `variables = c(name = "code")` syntax.
 
-```{r county-data}
+```{r iowa_counties}
 # Write your get_acs() code here
+# Variables of interest
+vars <- c(
+  median_household_income = "B19013_001",
+  total_population = "B01003_001"
+)
+
+# Pull 2022 ACS 5-year data for counties in Iowa
+iowa_counties <- get_acs(
+  geography = "county",
+  variables = c(
+    median_household_income = "B19013_001",
+    total_population = "B01003_001"
+  ),
+  state = "IA",
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+) %>%
+  mutate(
+    county = NAME %>%
+      str_remove(", Iowa") %>%
+      str_remove(", County")
+  ) %>%
+  select(
+    GEOID,
+    county,
+    median_household_incomeE,
+    median_household_incomeM,   # include MOE column
+    total_populationE,
+    total_populationM           # include MOE for total population if needed
+  )
+head(iowa_counties)
 
 # Clean the county names to remove state name and "County" 
+
 # Hint: use mutate() with str_remove()
 
+iowa_counties <- get_acs(
+  geography = "county",
+  variables = c(
+    median_household_income = "B19013_001",
+    total_population = "B01003_001"
+  ),
+  state = "IA",
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+) %>%
+  # Create readable county column BEFORE selecting other columns
+  mutate(
+    county = NAME %>%
+      str_remove(", Iowa") %>%
+      str_remove(" County")
+  ) %>%
+  # Now keep only the columns you need, including MOE
+  select(
+    GEOID,
+    county,
+    median_household_incomeE,
+    median_household_incomeM,
+    total_populationE,
+    total_populationM
+  )
+
 # Display the first few rows
+
+head(iowa_counties)
+
 ```
 
 ## 2.2 Data Quality Assessment
@@ -100,9 +172,30 @@ If there is a special character like comma, you need use double quote mark so th
 
 ```{r income-reliability}
 # Calculate MOE percentage and reliability categories using mutate()
+library(dplyr)
+
+# Calculate MOE percentages
+library(stringr)
+iowa_reliability <- iowa_counties %>%
+  mutate(
+    income_moe_pct = (median_household_incomeM / median_household_incomeE) * 100,
+    reliability = case_when(
+      income_moe_pct < 10 ~ "High",
+      income_moe_pct < 20 ~ "Medium",
+      TRUE ~ "Low"
+    )
+  )
+
+reliability_summary <- iowa_reliability %>%
+  count(reliability) %>%
+  mutate(pct = (n / sum(n)) * 100)
+
 
 # Create a summary showing count of counties in each reliability category
+
 # Hint: use count() and mutate() to add percentages
+
+reliability_summary
 ```
 
 ## 2.3 High Uncertainty Counties
@@ -120,12 +213,43 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r high-uncertainty}
 # Create table of top 5 counties by MOE percentage
 
+library(knitr)
+iowa_reliability <- iowa_counties %>%
+  mutate(
+    income_moe_pct = (median_household_incomeM / median_household_incomeE) * 100,
+    reliability = case_when(
+      income_moe_pct < 10 ~ "High",
+      income_moe_pct < 20 ~ "Moderate",
+      TRUE ~ "Low"
+    )
+  )
+top5_moe <- iowa_reliability %>%
+  arrange(desc(income_moe_pct)) %>%
+  slice_head(n = 5) %>%
+  select(
+    County = county,
+    `Median Household Income` = median_household_incomeE,
+    `Margin of Error` = median_household_incomeM,
+    `MOE %` = income_moe_pct,
+    Reliability = reliability
+  )
+
+
 # Format as table with kable() - include appropriate column names and caption
+kable(
+  top5_moe,
+  caption = "Top 5 Iowa Counties by Median Household Income MOE Percentage",
+  digits = 1
+)
+
+
 ```
 
 **Data Quality Commentary:**
 
 [Write 2-3 sentences explaining what these results mean for algorithmic decision-making. Consider: Which counties might be poorly served by algorithms that rely on this income data? What factors might contribute to higher uncertainty?]
+
+[The top five reliability in such a rural state only have Medium qualifiers. None are Low. The data is not that reliable and could prove difficult for algorithmic decision-making in rural areas. Scale is perhaps a big thing because of course population is lower so decreases reliability but it was an interesting test to see what MoE you would get in these areas. Also surprisingly it is not Des Moines county or Ames county which are much larger.]
 
 # Part 3: Neighborhood-Level Analysis
 
@@ -139,11 +263,22 @@ If there is a special character like comma, you need use double quote mark so th
 # Use filter() to select 2-3 counties from your county_reliability data
 # Store the selected counties in a variable called selected_counties
 
+selected_counties <- iowa_reliability %>%
+  filter(county %in% c("Adams", "Monroe")) %>%
+  select(
+    County = county,
+    `Median Household Income` = median_household_incomeE,
+    `MOE %` = income_moe_pct,
+    Reliability = reliability
+  )
+
 # Display the selected counties with their key characteristics
 # Show: county name, median income, MOE percentage, reliability category
+
+selected_counties
 ```
 
-**Comment on the output:** [write something :)]
+**Comment on the output:** [Its just a smaller tibble.]
 
 ## 3.2 Tract-Level Demographics
 
@@ -159,13 +294,46 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r tract-demographics}
 # Define your race/ethnicity variables with descriptive names
 
+race_vars <- c(
+  white = "B03002_003",
+  black = "B03002_004",
+  hispanic = "B03002_012",
+  total = "B03002_001"
+)
+
 # Use get_acs() to retrieve tract-level data
+county_codes <- str_sub(iowa_counties$GEOID, 3, 5)
+
 # Hint: You may need to specify county codes in the county parameter
 
 # Calculate percentage of each group using mutate()
 # Create percentages for white, Black, and Hispanic populations
+iowa_tracts <- get_acs(
+  geography = "tract",
+  variables = race_vars,
+  state = "IA",
+  county = county_codes,
+  year = 2022,
+  survey = "acs5",
+  output = "wide"
+) %>%
+  mutate(
+    pct_white = (whiteE / totalE) * 100,
+    pct_black = (blackE / totalE) * 100,
+    pct_hispanic = (hispanicE / totalE) * 100,
+    # Extract county and tract names separately
+    county_name = str_extract(NAME, "[^,]+"),
+    tract_name = str_extract(NAME, "Census Tract \\d+\\.?\\d*")
+  ) %>%
+  select(GEOID, tract_name, county_name,
+         totalE, whiteE, whiteM, blackE, blackM, hispanicE, hispanicM,
+         pct_white, pct_black, pct_hispanic)
+
 
 # Add readable tract and county name columns using str_extract() or similar
+
+head(iowa_tracts)
+
 ```
 
 ## 3.3 Demographic Analysis
@@ -175,11 +343,34 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r demographic-analysis}
 # Find the tract with the highest percentage of Hispanic/Latino residents
 # Hint: use arrange() and slice() to get the top tract
+top_hispanic_tract <- iowa_tracts %>%
+  arrange(desc(pct_hispanic)) %>%
+  slice(1) %>%
+  select(tract_name, county_name, pct_hispanic, totalE, hispanicE)
+
+top_hispanic_tract
+
 
 # Calculate average demographics by county using group_by() and summarize()
 # Show: number of tracts, average percentage for each racial/ethnic group
 
+county_summary <- iowa_tracts %>%
+  group_by(county_name) %>%
+  summarize(
+    num_tracts = n(),
+    avg_pct_white = mean(pct_white, na.rm = TRUE),
+    avg_pct_black = mean(pct_black, na.rm = TRUE),
+    avg_pct_hispanic = mean(pct_hispanic, na.rm = TRUE)
+  ) %>%
+  arrange(desc(avg_pct_hispanic)) 
+
 # Create a nicely formatted table of your results using kable()
+kable(
+  county_summary,
+  caption = "Iowa County-Level Average Racial/Ethnic Percentages and Tract Counts",
+  digits = 1
+)
+
 ```
 
 # Part 4: Comprehensive Data Quality Evaluation
@@ -196,11 +387,37 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r demographic-moe}
 # Calculate MOE percentages for white, Black, and Hispanic variables
 # Hint: use the same formula as before (margin/estimate * 100)
+iowa_tracts <- iowa_tracts %>%
+  mutate(
+    moe_pct_white = (whiteM / whiteE) * 100,
+    moe_pct_black = (blackM / blackE) * 100,
+    moe_pct_hispanic = (hispanicM / hispanicE) * 100
+  )
 
 # Create a flag for tracts with high MOE on any demographic variable
 # Use logical operators (| for OR) in an ifelse() statement
+iowa_tracts_qc <- iowa_tracts %>%
+  mutate(
+    moe_pct_white = (whiteM / whiteE) * 100,
+    moe_pct_black = (blackM / blackE) * 100,
+    moe_pct_hispanic = (hispanicM / hispanicE) * 100,
+    high_moe_flag = ifelse(
+      moe_pct_white > 20 | moe_pct_black > 20 | moe_pct_hispanic > 20,
+      TRUE,
+      FALSE
+    )
+  )
 
 # Create summary statistics showing how many tracts have data quality issues
+moe_summary <- iowa_tracts_qc %>%
+  summarize(
+    total_tracts = n(),
+    tracts_high_moe = sum(high_moe_flag),
+    pct_high_moe = (tracts_high_moe / total_tracts) * 100
+  )
+
+moe_summary
+
 ```
 
 ## 4.2 Pattern Analysis
@@ -209,14 +426,40 @@ If there is a special character like comma, you need use double quote mark so th
 
 ```{r pattern-analysis}
 # Group tracts by whether they have high MOE issues
+iowa_tracts <- iowa_tracts %>%
+  mutate(
+    high_moe_flag = ifelse(
+      moe_pct_white > 20 | moe_pct_black > 20 | moe_pct_hispanic > 20,
+      TRUE,
+      FALSE
+    )
+  )
+
 # Calculate average characteristics for each group:
 # - population size, demographic percentages
-
 # Use group_by() and summarize() to create this comparison
+moe_comparison <- iowa_tracts %>%
+  group_by(high_moe_flag) %>%
+  summarize(
+    num_tracts = n(),
+    avg_population = mean(totalE, na.rm = TRUE),
+    avg_pct_white = mean(pct_white, na.rm = TRUE),
+    avg_pct_black = mean(pct_black, na.rm = TRUE),
+    avg_pct_hispanic = mean(pct_hispanic, na.rm = TRUE)
+  )
+
 # Create a professional table showing the patterns
+
+kable(
+  moe_comparison,
+  caption = "Comparison of Census Tracts by High MOE Flag",
+  digits = 1
+)
 ```
 
 **Pattern Analysis:** [Describe any patterns you observe. Do certain types of communities have less reliable data? What might explain this?]
+
+[It makes sense to me that areas with smaller total populations will have a higher MoE. Racially also if the population is smaller, like in Iowa - Black populations are very small, they would have higher MoE as well than their White communities. ]
 
 
 # Part 5: Policy Recommendations
@@ -233,7 +476,10 @@ If there is a special character like comma, you need use double quote mark so th
 
 **Executive Summary:**
 
-[Your integrated 4-paragraph summary here]
+[1. Rural areas still contain many High MoE at the county level. When you transfer that to neighborhoods or groups of people, the MoE just increases (gets lower) because the sample size gets even smaller. This could pose potential issues in algorithmic analysis for policy recommendations and you really need to monitor the outcomes.
+2. Smaller communities, like for instance Iowa has a very low population of Black people, would have extremely high MoE and would face greater risk of algorithmic bias.
+3. The sample size. We also talked about human choice in all the steps like how you clean data, what you choose to classify (like MoE as high or medium what percent makes this decision?), to variables you put into the model.
+4. There definitely needs to be checks as there are a lot of blind spots, especially it seems in rural areas where data quality and quantity are not as good as urban areas? One needs guardrails and other modes of analysis on top of algorithmic analysis.]
 
 ## 6.3 Specific Recommendations
 
@@ -242,28 +488,55 @@ If there is a special character like comma, you need use double quote mark so th
 ```{r recommendations-data}
 # Create a summary table using your county reliability data
 # Include: county name, median income, MOE percentage, reliability category
+county_reliability <- iowa_reliability %>%
+  mutate(
+    income_moe_pct = (median_household_incomeM / median_household_incomeE) * 100,
+    reliability = case_when(
+      income_moe_pct < 10 ~ "High",
+      income_moe_pct < 20 ~ "Moderate",
+      TRUE ~ "Low"
+    ),
 
 # Add a new column with algorithm recommendations using case_when():
 # - High Confidence: "Safe for algorithmic decisions"
 # - Moderate Confidence: "Use with caution - monitor outcomes"  
 # - Low Confidence: "Requires manual review or additional data"
+    algorithm_recommendation = case_when(
+      reliability == "High" ~ "Safe for algorithmic decisions",
+      reliability == "Moderate" ~ "Use with caution - monitor outcomes",
+      reliability == "Low" ~ "Requires manual review or additional data"
+    )
+  ) %>%
+  select(
+    County = county,
+    `Median Household Income` = median_household_incomeE,
+    `MOE %` = income_moe_pct,
+    Reliability = reliability,
+    `Algorithm Recommendation` = algorithm_recommendation
+  )
 
 # Format as a professional table with kable()
+kable(
+  county_reliability,
+  caption = "Iowa County Median Income Reliability and Algorithm Recommendations",
+  digits = 1
+)
+
 ```
 
 **Key Recommendations:**
 
 **Your Task:** Use your analysis results to provide specific guidance to the department.
 
-1. **Counties suitable for immediate algorithmic implementation:** [List counties with high confidence data and explain why they're appropriate]
+1. **Counties suitable for immediate algorithmic implementation:** [Most counties in Iowa are save for immediate algorithmic implementation because our model describes High MoE as less than 10%. Most fit this category.]
 
-2. **Counties requiring additional oversight:** [List counties with moderate confidence data and describe what kind of monitoring would be needed]
+2. **Counties requiring additional oversight:** [There are just a few that are listed as Moderate and would require additional oversight including Adams, Audubon, Cass, Clay, Howard, Ida, Louisa, Lucas, Monroe, O'Brien, Ringgold, Shelby, Wayne, and Winnebago]
 
-3. **Counties needing alternative approaches:** [List counties with low confidence data and suggest specific alternatives - manual review, additional surveys, etc.]
+3. **Counties needing alternative approaches:** [There were actually no counties needed alternative approaches. This was a bit surprising as I thought most has potential to fall into this category.]
 
 ## Questions for Further Investigation
 
-[List 2-3 questions that your analysis raised that you'd like to explore further in future assignments. Consider questions about spatial patterns, time trends, or other demographic factors.]
+[Why were there no Low scoring counties? Is that because our parameters for scoring these categories are too low? This was my own human error? Are county level analysis usually safe for algorithmic implementation anyway?]
 
 # Technical Notes
 
@@ -277,10 +550,10 @@ If there is a special character like comma, you need use double quote mark so th
 - Complete code and documentation available at: [your portfolio URL]
 
 **Methodology Notes:**
-[Describe any decisions you made about data processing, county selection, or analytical choices that might affect reproducibility]
+[I may have way over simplified the parameters of High, Medium, and Low MoE. I will need to check this in class.]
 
 **Limitations:**
-[Note any limitations in your analysis - sample size issues, geographic scope, temporal factors, etc.]
+[I thought the geographic (rural) scope would be interesting to do but I don't think it gave any limitations as the sample size for the county level and neighborhood level seemed usable. The data is simply from ACS.]
 
 ---
 
@@ -290,7 +563,7 @@ Before submitting your portfolio link on Canvas:
 
 - [ ] All code chunks run without errors
 - [ ] All "[Fill this in]" prompts have been completed
-- [ ] Tables are properly formatted and readable
+- [ ] Tables are properly formatted and readable 
 - [ ] Executive summary addresses all four required components
 - [ ] Portfolio navigation includes this assignment
 - [ ] Census API key is properly set 
