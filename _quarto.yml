@@ -18,6 +18,12 @@ website:
             text: "Week 2"
           - href: weekly-notes/week-03-notes.qmd
             text: "Week 3"
+          - href: weekly-notes/week-04-notes.qmd
+            text: "Week 4"
+          - href: weekly-notes/week-05-notes.qmd
+            text: "Week 5"
+          - href: weekly-notes/week-06-notes.qmd
+            text: "Week 6"
       - text: "Labs"
         menu:
           - href: Labs/lab_00/lab0_template.qmd
@@ -26,6 +32,8 @@ website:
         menu:
           - href: Assignments/assignment_01/assignment1_template.qmd
             text: "Assignment 1: Census Data Exploration"
+          - href: Assignments/assignment_02/assignment2_template.qmd
+            text: "Assignment 2: Spatial Analysis and Visualization "
 format:
   html:
     theme: cosmo
