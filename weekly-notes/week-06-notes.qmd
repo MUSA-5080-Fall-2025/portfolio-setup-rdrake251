@@ -1,0 +1,25 @@
+---
+title: "Week 6 Notes - Spatial Machine Learning - Linear Regression Continued"
+date: "2025-10-13"
+---
+
+## Key Concepts Learned
+- [Introduction to advanced linear regression]
+- [Intro to why space matters like Hedonic model framework and Tobler's First Law and Spatial autocorrelation]
+- [Interaction Effects - does the effect of one variable depend on the level of another variable?]
+
+## Coding Techniques
+- [WGS84 and Nad83 not that different]
+- [st_as_sf: converting to spatial data crs is what LAT LONG are in in the dataframe]
+- []
+
+## Questions & Challenges
+- []
+- []
+
+## Connections to Policy
+- []
+
+## Reflection
+- []
+- []

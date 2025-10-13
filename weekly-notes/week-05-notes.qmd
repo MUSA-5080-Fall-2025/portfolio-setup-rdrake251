@@ -1,0 +1,23 @@
+---
+title: "Week 5 Notes - Introduction to Linear Regression"
+date: "2025-10-06"
+---
+
+## Key Concepts Learned
+- [Introduction to linear regression]
+- []
+
+## Coding Techniques
+- []
+- []
+
+## Questions & Challenges
+- []
+- []
+
+## Connections to Policy
+- []
+
+## Reflection
+- []
+- []

@@ -1,0 +1,23 @@
+---
+title: "Week 4 Notes - Spacial Data and GIS Operations in R"
+date: "2025-09-29"
+---
+
+## Key Concepts Learned
+- [Did some review of GIS and mapping in R]
+- [Now getting into what you can do with spacial data.]
+
+## Coding Techniques
+- [geojson are amazing rather than shapefiles - so easy!]
+- [getting more comfortable with different spacial analysis]
+
+## Questions & Challenges
+- [There is a lot to know about projections and selecting the correct projections.]
+- [See Line 369 for next steps for Assignemnt 2 in the Inclass practice since we didn't get to it.]
+
+## Connections to Policy
+- [PROJECTIONS ARE EXTREMELY IMPORTANT TO MAKE SURE SPACIAL DATA IS ACCURATELY PORTRAYED BEST]
+
+## Reflection
+- [I really liked the history of projections and development of the mapping. Honestly walking through the lecture codes was extremely helpful. ]
+- [I enjoy the pace of this class, it is very helpful to learn the background of the code and what it means.]
