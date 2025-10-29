@@ -1,0 +1,7 @@
+"0",""
+"0","## Crime Counts"
+"0","ggplot(OPA_points, aes(x = crime_cnt_0p5mi)) +"
+"0","  geom_histogram(fill = ""firebrick"", color = ""white"", bins = 30) +"
+"0","  labs(title = ""Distribution: Crime Incidents Within 0.5 mi"","
+"0","       x = ""Crime Count (2023–2024)"", y = ""Number of Parcels"") +"
+"0","  theme_minimal()"

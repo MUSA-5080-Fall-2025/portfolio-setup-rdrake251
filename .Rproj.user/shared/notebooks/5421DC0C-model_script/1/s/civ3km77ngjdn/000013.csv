@@ -1,0 +1,7 @@
+"0",""
+"0","## Hospital Proximity"
+"0","ggplot(OPA_points, aes(x = dist_nearest_hospital_ft)) +"
+"0","  geom_histogram(fill = ""darkorange"", color = ""white"", bins = 30) +"
+"0","  labs(title = ""Distribution: Distance to Nearest Hospital"","
+"0","       x = ""Feet to Nearest Hospital"", y = ""Count"") +"
+"0","  theme_minimal()"

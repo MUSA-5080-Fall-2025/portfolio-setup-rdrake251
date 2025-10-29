@@ -1,0 +1,4 @@
+"0",""
+"0","# get NA counts per column"
+"0","na_counts <- sapply(demo_vars_phl, function(x) {sum(is.na(x))})"
+"0","kable(t(as.data.frame(na_counts)))"

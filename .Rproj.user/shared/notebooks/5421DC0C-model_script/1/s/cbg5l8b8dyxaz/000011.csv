@@ -1,0 +1,4 @@
+"0","plot(demo_vars_phl[,""med_hh_incE""],"
+"0","     main = ""Median Household Income"","
+"0","     breaks = seq(0, 200000, 10000),"
+"0","     nbreaks = 20)"

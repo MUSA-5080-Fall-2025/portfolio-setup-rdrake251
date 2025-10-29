@@ -1,0 +1,5 @@
+"0","plot(demo_vars_phl[,""med_ageE""],"
+"0","     main = ""Median Age"","
+"0","     breaks = seq(0, 75, 5),"
+"0","     nbreaks = 15)"
+"0",""

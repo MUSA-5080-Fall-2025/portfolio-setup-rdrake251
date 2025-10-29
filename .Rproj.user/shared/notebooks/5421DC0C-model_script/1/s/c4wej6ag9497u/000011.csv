@@ -1,0 +1,7 @@
+"0",""
+"0","# filter out all rows that have at least one column with an na value"
+"0","na_index <- !complete.cases(demo_vars_phl %>% st_drop_geometry())"
+"0","demo_vars_phl_na <- demo_vars_phl[na_index,]"
+"0","kable(head(demo_vars_phl_na, 5) %>% select(-ends_with(""M"")) %>% st_drop_geometry(),"
+"0","      col.names = c(""GeoID"", ""Tract"", ""County"", ""State"", ""Population"", ""Median HH Inc ($)"", ""Median Age (yrs)""),"
+"0","      row.names = F)"

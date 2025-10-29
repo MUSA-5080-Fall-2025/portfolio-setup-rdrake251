@@ -1,0 +1,67 @@
+/* ---------- Base white background ---------- */
+.reveal-viewport,
+.reveal,
+.reveal .slides {
+  background: #ffffff !important;
+}
+
+/* ---------- Global text (all serif) ---------- */
+.reveal,
+.reveal p,
+.reveal li,
+.reveal table,
+.reveal td,
+.reveal th,
+.reveal small,
+.reveal code {
+  font-family: "Garamond", "Times New Roman", "Book Antiqua", Palatino, serif !important;
+  font-weight: 300;        /* thinner weight */
+  color: #333333;          /* charcoal gray */
+  line-height: 1.5;
+  letter-spacing: 0.2px;
+}
+
+/* ---------- Headings ---------- */
+.reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+  font-family: "Garamond", "Times New Roman", "Book Antiqua", Palatino, serif !important;
+  font-weight: 400;        /* light/medium weight */
+  color: #222222;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- Bold & emphasis ---------- */
+.reveal strong, .reveal b {
+  font-weight: 600;        /* slightly thicker for contrast */
+  color: #111111;
+}
+
+/* ---------- Links ---------- */
+.reveal a {
+  color: #004c99;
+  text-decoration: none;
+}
+.reveal a:hover {
+  color: #00264d;
+  text-decoration: underline;
+}
+
+/* ---------- Code blocks ---------- */
+.reveal pre code {
+  font-family: "Courier New", Courier, monospace !important;
+  background-color: #f5f5f5;
+  color: #333333;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+/* ---------- Images ---------- */
+.reveal section img {
+  display: block;
+  margin: 1.2em auto;
+  border-radius: 0;     /* no rounding */
+  box-shadow: none;     /* no shadow or background */
+  max-width: 90%;
+  background: none;     /* explicitly remove any background */
+}

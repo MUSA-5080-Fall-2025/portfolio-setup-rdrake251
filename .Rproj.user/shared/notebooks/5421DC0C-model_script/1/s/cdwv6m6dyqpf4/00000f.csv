@@ -1,0 +1,8 @@
+"0",""
+"0","# Transit stops (raw)"
+"0","ggplot() +"
+"0","  geom_sf(data = nhoods, "
+"0","          fill = NA, color = ""grey70"", linewidth = 0.3) +"
+"0","  geom_sf(data = transit, size = 0.3, alpha = 0.6) +"
+"0","  labs(title = ""Raw Layer Check: Transit Stops (SEPTA Spring 2025)"") +"
+"0","  theme_void()"

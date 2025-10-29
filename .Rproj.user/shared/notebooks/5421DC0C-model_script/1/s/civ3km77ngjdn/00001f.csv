@@ -1,0 +1,7 @@
+"0",""
+"0","## Schools Accessibility"
+"0","ggplot(OPA_points, aes(x = schools_cnt_0p5mi)) +"
+"0","  geom_histogram(fill = ""purple"", color = ""white"", bins = 20) +"
+"0","  labs(title = ""Distribution: Schools Within 0.5 mi"","
+"0","       x = ""School Count (0.5 mi Buffer)"", y = ""Number of Parcels"") +"
+"0","  theme_minimal()"

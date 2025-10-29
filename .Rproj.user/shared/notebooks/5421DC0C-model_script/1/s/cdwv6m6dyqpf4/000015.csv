@@ -1,0 +1,8 @@
+"0",""
+"0","# Schools (centroids of polygons) — raw"
+"0","ggplot() +"
+"0","  geom_sf(data = nhoods, "
+"0","          fill = NA, color = ""grey70"", linewidth = 0.3) +"
+"0","  geom_sf(data = schools, size = 0.4, alpha = 0.7) +"
+"0","  labs(title = ""Raw Layer Check: Schools (Centroids)"") +"
+"0","  theme_void()"

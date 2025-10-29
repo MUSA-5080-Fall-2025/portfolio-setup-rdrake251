@@ -1,0 +1,8 @@
+"0",""
+"0","# Define 10-fold CV"
+"0","train_control <- trainControl("
+"0","  method = ""cv"","
+"0","  number = 10,"
+"0","  savePredictions = ""final"""
+"0",")"
+"0",""

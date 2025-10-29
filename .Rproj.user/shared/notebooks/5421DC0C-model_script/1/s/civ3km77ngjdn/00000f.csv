@@ -1,0 +1,7 @@
+"0",""
+"0","## Transit Accessibility"
+"0","ggplot(OPA_points, aes(x = dist_nearest_transit_ft)) +"
+"0","  geom_histogram(fill = ""steelblue"", color = ""white"", bins = 30) +"
+"0","  labs(title = ""Distribution: Distance to Nearest Transit Stop"","
+"0","       x = ""Feet to Nearest Stop"", y = ""Count"") +"
+"0","  theme_minimal()"

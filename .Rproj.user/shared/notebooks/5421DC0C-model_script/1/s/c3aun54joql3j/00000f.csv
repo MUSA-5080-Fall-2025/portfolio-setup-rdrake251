@@ -1,0 +1,8 @@
+"0",""
+"0","# join data separately here to avoid conflicts with earlier code blocks"
+"0","OPA_points_copy <- left_join(OPA_points,"
+"0","                             neighbor_points %>%"
+"0","                               select(parcel_number, wealthy_neighborhood) %>%"
+"0","                               st_drop_geometry(),"
+"0","                             by = ""parcel_number"")"
+"0",""

@@ -1,0 +1,6 @@
+"0",""
+"0","# plot cenusus variables to compare"
+"0","plot(demo_vars_phl[,""pop_totE""],"
+"0","     main = ""Total Population"","
+"0","     breaks = seq(0, 10500, 500),"
+"0","     nbreaks = 21)"
