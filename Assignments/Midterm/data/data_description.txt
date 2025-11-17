@@ -1,0 +1,13 @@
+1. PPR_Program_Sites: recreation centers, playgrounds, older adult centers, swimming pools, and environmental education centers
+
+2. Schools_Parcels: The parcel locations of public (School District of Philadelphia), charter, private and archdiocesan schools in the City of Philadelphia. Please keep in mind that this data, particularly with regards to enrollment, is constantly changing or is not publicly available. If you have specific questions about a school, please contact that facility directly. This dataset includes the location of schools in the City of Philadelphia with attribute information for address, grade level, type, and status. The institution types are displayed by default using the following subtypes: district (public schools), charter and private (including archdiocesan). There is also a point layer of Schools available.
+
+3. crime_incidents_2022: Crime incidents from the Philadelphia Police Department. Part I crimes include violent offenses such as aggravated assault, rape, arson, among others. Part II crimes include simple assault, prostitution, gambling, fraud, and other non-violent offenses.
+
+4. Health_Centers: The location of primary care health centers.
+
+5. NeighborhoodFoodRetail: This dataset is derived from the Neighborhood Food Retail in Philadelphia report. The report, and accompanying online resource gallery, looks at neighborhood availability of “high-produce supply stores” (e.g., supermarkets, produce stores, farmers’ markets) in relation to “low-produce supply stores” (like dollar stores, pharmacies, and convenience stores).
+
+6. Hospitals: A list of hospitals and their location in Philadelphia.
+
+7. philadelphia-neighborhoods: This dataset includes neighborhood boundaries for 150+ neighborhoods in Philadelphia. The data was gathered from a mix of publicly available maps, including from the City of Philadelphia, the City Archives, the Philadelphia Inquirer, and user feedback.
