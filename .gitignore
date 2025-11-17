@@ -1,0 +1,4 @@
+# Ignore large 311 data files
+Assignments/assignment_04/data/311_Service_Requests_Pot_Holes.csv
+Assignments/assignment_04/data/*.csv
+

@@ -1,0 +1,916 @@
+---
+title: "Predictive Policing - Technical Implementation"
+subtitle: "MUSA 5080 - Fall 2025"
+author: "Ryan Drake"
+date: 11/17/2025
+format:
+  html:
+    code-fold: show
+    code-tools: true
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    theme: cosmo
+    embed-resources: true
+editor: visual
+execute:
+  warning: false
+  message: false
+---
+
+## About This Assignment
+
+This assignment will build a spatial predictive model for Chicago tree debris 311 reports using count regression and spatial features:
+
+1.  Create a fishnet grid for aggregating point-level crime data
+2.  Calculate spatial features including k-nearest neighbors and distance measures
+3.  Diagnose spatial autocorrelation using Local Moran's I
+4.  Fit and interpret Poisson and Negative Binomial regression for count data
+5.  Implement spatial cross-validation (Leave-One-Group-Out)
+6.  Compare model predictions to a Kernel Density Estimation baseline
+7.  Evaluate model performance using appropriate metrics
+
+# Setup
+
+```{r setup}
+#| message: false
+#| warning: false
+
+# Load required packages
+library(tidyverse)      # Data manipulation
+library(sf)             # Spatial operations
+library(here)           # Relative file paths
+library(viridis)        # Color scales
+library(terra)          # Raster operations (replaces 'raster')
+library(spdep)          # Spatial dependence
+library(FNN)            # Fast nearest neighbors
+library(MASS)           # Negative binomial regression
+library(patchwork)      # Plot composition (replaces grid/gridExtra)
+library(knitr)          # Tables
+library(kableExtra)     # Table formatting
+library(classInt)       # Classification intervals
+library(here)
+
+# Spatstat split into sub-packages
+library(spatstat.geom)    # Spatial geometries
+library(spatstat.explore) # Spatial exploration/KDE
+
+# Set options
+options(scipen = 999)  # No scientific notation
+set.seed(5080)         # Reproducibility
+
+# Create consistent theme for visualizations
+theme_crime <- function(base_size = 11) {
+  theme_minimal(base_size = base_size) +
+    theme(
+      plot.title = element_text(face = "bold", size = base_size + 1),
+      plot.subtitle = element_text(color = "gray30", size = base_size - 1),
+      legend.position = "right",
+      panel.grid.minor = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank()
+    )
+}
+
+# Set as default
+theme_set(theme_crime())
+
+cat("✓ All packages loaded successfully!\n")
+cat("✓ Working directory:", getwd(), "\n")
+```
+
+# Part 1: Load and Explore Data
+
+## Exercise 1.1: Load Chicago Spatial Data
+
+```{r load-boundaries}
+#| message: false
+
+# Load police districts (used for spatial cross-validation)
+policeDistricts <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/24zt-jpfn?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = dist_num)
+
+# Load police beats (smaller administrative units)
+policeBeats <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/n9it-hstw?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(Beat = beat_num)
+
+# Load Chicago boundary
+chicagoBoundary <- 
+  st_read("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/Chapter5/chicagoBoundary.geojson") %>%
+  st_transform('ESRI:102271')
+
+cat("✓ Loaded spatial boundaries\n")
+cat("  - Police districts:", nrow(policeDistricts), "\n")
+cat("  - Police beats:", nrow(policeBeats), "\n")
+```
+
+::: callout-note
+## Coordinate Reference System
+
+We're using `ESRI:102271` (Illinois State Plane East, NAD83, US Feet). This is appropriate for Chicago because:
+
+-   It minimizes distortion in this region
+-   Uses feet (common in US planning)
+-   Allows accurate distance calculations
+:::
+
+## Exercise 1.2: Load Tree Debris Data
+
+```{r load-tree debris}
+#| message: false
+
+# Load from provided data file (downloaded from Chicago open data portal)
+treedebris <- read_csv(here("Assignments/assignment_04/data",
+                             "311_Service_Requests_Tree_Debris.csv"))
+
+names(treedebris)
+
+treedebris %>% 
+  summarize(
+    n_rows = n(),
+    n_missing_lon = sum(is.na(Longitude)),
+    n_missing_lat = sum(is.na(Latitude))
+  )
+
+treedebris_sf <- treedebris %>% 
+  # keep only rows with both coords present
+  filter(!is.na(Longitude), !is.na(Latitude)) %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>% 
+  st_transform("ESRI:102271")
+
+
+# Check the data
+cat("\n✓ Loaded treedebris data\n")
+cat("  - Number of treedebris:", nrow(treedebris_sf), "\n")
+cat("  - CRS:", st_crs(treedebris_sf)$input, "\n")
+cat("  - Date range:", min(treedebris_sf$`Completion Date`, na.rm = TRUE), "to", 
+    max(treedebris_sf$`Completion Date`, na.rm = TRUE), "\n")
+```
+
+**Question 1.1:** How many tree debris reports are in the data set? What time period does this cover? Why does the coordinate reference system matter for our spatial analysis?
+
+*Your answer here:* There are 163,364 reports of completed tree debris reports within the data range of 01/02/2013 to 12/31/2015. Having this file in the Illinois State Plane East coordinate reference system (102271) will help to minimize distortion, it uses feet, and will make our distance calculations more accurate.
+
+## Exercise 1.3: Visualize Point Data
+
+```{r visualize-points}
+#| fig-width: 10
+#| fig-height: 5
+
+# Simple point map
+p1 <- ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "gray95", color = "gray60") +
+  geom_sf(data = treedebris_sf, color = "#d62828", size = 0.1, alpha = 0.4) +
+  labs(
+    title = "Tree Debris Locations",
+    subtitle = paste0("Chicago 2017, n = ", nrow(treedebris_sf))
+  )
+
+# Density surface using modern syntax
+p2 <- ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "gray95", color = "gray60") +
+  geom_density_2d_filled(
+    data = data.frame(st_coordinates(treedebris_sf)),
+    aes(X, Y),
+    alpha = 0.7,
+    bins = 8
+  ) +
+  scale_fill_viridis_d(
+    option = "plasma",
+    direction = -1,
+    guide = "none"  # Modern ggplot2 syntax (not guide = FALSE)
+  ) +
+  labs(
+    title = "Density Surface",
+    subtitle = "Kernel density estimation"
+  )
+
+# Combine plots using patchwork (modern approach)
+p1 + p2 + 
+  plot_annotation(
+    title = "Spatial Distribution of Tree Debris in Chicago",
+    tag_levels = 'A'
+  )
+```
+
+**Question 1.2:** What spatial patterns do you observe? Are tree debris evenly distributed across Chicago? Where are the highest concentrations? What might explain these patterns?
+
+*Your answer here:* Tree Debris reports seem to be evenly reported across Chicago. South Chicago sees less reports of tree debris and the density map shows this. Based on my own knowledge of the tree canopy of Chicago, South Chicago and the middle areas are less dense in canopy cover so there are less trees that would have tree debris. Even split would be expected nonetheless since tree debris would be evenly distributed based on weather and other outside factors.
+
+# Part 2: Create Fishnet Grid
+
+## Exercise 2.1: Understanding the Fishnet
+
+```{r create-fishnet}
+# Create 500m x 500m grid
+fishnet <- st_make_grid(
+  chicagoBoundary,
+  cellsize = 500,  # 500 meters per cell
+  square = TRUE
+) %>%
+  st_sf() %>%
+  mutate(uniqueID = row_number())
+
+# Keep only cells that intersect Chicago
+fishnet <- fishnet[chicagoBoundary, ]
+
+# View basic info
+cat("✓ Created fishnet grid\n")
+cat("  - Number of cells:", nrow(fishnet), "\n")
+cat("  - Cell size:", 500, "x", 500, "meters\n")
+cat("  - Cell area:", round(st_area(fishnet[1,])), "square meters\n")
+```
+
+**Question 2.1:** Why do we use a regular grid instead of existing boundaries like neighborhoods or census tracts? What are the advantages and disadvantages of this approach?
+
+*Your answer here:* The fishnet grid approach is a neutral way of forming a grid for spatial analysis. The equal sized cells make comparative analysis more consistent and can let you see fine detail of hot spots and other spatial analysis. However, since neighborhoods or census tracts are tied to administrative units, and they are thus tied to budgets, policies, etc., a regular grid is more difficult to apply to policy. There is also scale sensitivity of having too small or too large a grid which can impact interpretation.
+
+## Exercise 2.2: Aggregate Tree Debirs to Grid
+
+```{r treedebris-distribution}
+cat("\nTree Debris count distribution:\n")
+
+summary(fishnet$counttreedebris_sf)
+
+cat(
+  "\nCells with zero tree debris:",
+  sum(fishnet$counttreedebris_sf == 0), "/", nrow(fishnet),
+  "(", round(100 * sum(fishnet$counttreedebris_sf == 0) / nrow(fishnet), 1), "%)\n"
+)
+```
+
+```{r aggregate-tree debris}
+# Spatial join: which cell contains each tree debris?
+treedebris_fishnet <- st_join(treedebris_sf, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(counttreedebris_sf = n())
+
+# Join back to fishnet (cells with 0 burglaries will be NA)
+fishnet <- fishnet %>%
+  left_join(treedebris_fishnet, by = "uniqueID") %>%
+  mutate(counttreedebris_sf = replace_na(counttreedebris_sf, 0))
+
+# Summary statistics
+cat("\nTree Debris count distribution:\n")
+summary(fishnet$counttreedebris_sf)
+cat("\nCells with zero tree debris:", 
+    sum(fishnet$counttreedebris_sf == 0), 
+    "/", nrow(fishnet),
+    "(", round(100 * sum(fishnet$counttreedebris_sf == 0) / nrow(fishnet), 1), "%)\n")
+```
+
+```{r visualize-fishnet}
+#| fig-width: 8
+#| fig-height: 6
+
+# Visualize aggregated counts
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = counttreedebris_sf), color = NA) +
+  geom_sf(data = chicagoBoundary, fill = NA, color = "white", linewidth = 1) +
+  scale_fill_viridis_c(
+    name = "Tree Debris",
+    option = "plasma",
+    trans = "sqrt",  # Square root for better visualization of skewed data
+    breaks = c(0, 1, 5, 10, 20, 40)
+  ) +
+  labs(
+    title = "Tree Debris Counts by Grid Cell",
+    subtitle = "500m x 500m cells, Chicago 2013-2015"
+  ) +
+  theme_crime()
+```
+
+**Question 2.2:** What is the distribution of tree debris counts across cells? Why do so many cells have zero tree debris? Is this distribution suitable for count regression? (Hint: look up overdispersion)
+
+*Your answer here:* The map shows largely blue pattern meaning most cells follow a zero distribution. The 311 reports are dependent on areas with trees, people reporting these activities, influenced by weather patterns, and can be in places there aren't as many trees like parking lots, industrial areas, or commercial areas. There is 12.9% that have zero tree debris count. This all makes the pattern strongly over dispersed. Thus this isn't suitable for count regression because there can't be negative counts.
+
+# Part 3: Create a Kernel Density Baseline
+
+```{r kde-baseline}
+#| message: false
+
+# Convert tree debris to ppp (point pattern) format for spatstat
+treedebris_ppp <- as.ppp(
+  st_coordinates(treedebris_sf),
+  W = as.owin(st_bbox(chicagoBoundary))
+)
+
+# Calculate KDE with 1km bandwidth
+kde_treedebris <- density.ppp(
+  treedebris_ppp,
+  sigma = 1000,  # 1km bandwidth
+  edge = TRUE    # Edge correction
+)
+
+# Convert to terra raster (modern approach, not raster::raster)
+kde_raster <- rast(kde_treedebris)
+
+# Extract KDE values to fishnet cells
+fishnet <- fishnet %>%
+  mutate(
+    kde_value = terra::extract(
+      kde_raster,
+      vect(fishnet),
+      fun = mean,
+      na.rm = TRUE
+    )[, 2]  # Extract just the values column
+  )
+
+cat("✓ Calculated KDE baseline\n")
+```
+
+```{r visualize-kde}
+#| fig-width: 8
+#| fig-height: 6
+
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = kde_value), color = NA) +
+  geom_sf(data = chicagoBoundary, fill = NA, color = "white", linewidth = 1) +
+  scale_fill_viridis_c(
+    name = "KDE Value",
+    option = "plasma"
+  ) +
+  labs(
+    title = "Kernel Density Estimation Baseline",
+    subtitle = "Simple spatial smoothing of tree debris locations"
+  ) +
+  theme_crime()
+```
+
+**Question 3.1:** How does the KDE map compare to the count map? What does KDE capture well? What does it miss?
+
+*Your answer here:* The KDE captures a much smoother version of tree debris activity and its clusters. This gradient and neighborhood scale visualization better connects to the tree canopy cover and residential and storm response patterns. This is also helpful as isn't tied to the grid so it can be more interpret-able. The KDE is still not counts though, just intensity map. So it doesn't show actual numbers of tree debris requests or even which cells actually contain the requests. It also depends on size and location such as similar count cells make look similar after this kind of smoothing or spreading influence to areas of industrial or commercial which have a lower tree canopy but smoothing spreads into these areas. KDE is simply just an overall pattern.
+
+# Part 4: Create Spatial Predictor Variables
+
+## Exercise 4.1: Load 311 Pothole Calls
+
+```{r load-potholes}
+#| message: false
+# Load from provided data file (downloaded from Chicago open data portal)
+potholes <- read_csv(here("Assignments/assignment_04/data",
+                             "311_Service_Requests_Pot_Holes.csv"))
+
+names(potholes)
+
+potholes %>% 
+  summarize(
+    n_rows = n(),
+    n_missing_lon = sum(is.na(LONGITUDE)),
+    n_missing_lat = sum(is.na(LATITUDE))
+  )
+
+potholes_sf <- potholes %>% 
+  # keep only rows with both coords present
+  filter(!is.na(LONGITUDE), !is.na(LATITUDE)) %>% 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>% 
+  st_transform("ESRI:102271")
+
+
+# Check the data
+cat("\n✓ Loaded potholes data\n")
+cat("  - Number of potholes:", nrow(potholes_sf), "\n")
+cat("  - CRS:", st_crs(potholes_sf)$input, "\n")
+cat("  - Date range:", min(potholes_sf$`CREATION DATE`, na.rm = TRUE), "to", 
+    max(potholes_sf$`CREATION DATE`, na.rm = TRUE), "\n")
+```
+
+## Exercise 4.2: Count of Pot Holes per Cell
+
+```{r count-pot holes}
+# Aggregate pothole calls to fishnet
+potholes_fishnet <- st_join(potholes_sf, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(potholes_sf = n())
+
+# Join to fishnet
+fishnet <- fishnet %>%
+  left_join(potholes_fishnet, by = "uniqueID") %>%
+  mutate(potholes_sf = replace_na(potholes_sf, 0))
+
+cat("Potholes distribution:\n")
+summary(fishnet$potholes_sf)
+```
+
+```{r visualize-potholes}
+#| fig-width: 10
+#| fig-height: 4
+
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = counttreedebris_sf), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "magma") +
+  labs(title = "Tree Debris 311 Calls") +
+  theme_crime()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = potholes_sf), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "plasma") +
+  labs(title = "Potholes") +
+  theme_crime()
+
+p1 + p2 +
+  plot_annotation(title = "Are tree debris and potholes correlated?")
+```
+
+**Question 4.1:** Do you see a visual relationship between tree debris and potholes? What does this suggest?
+
+*Your answer here:* Firstly, potholes occur much more frequently so the map for that is more intense. There is some strong spatial overlap in South and Southwest Chicago and moderate overlap in Northern Chicago. It doesn't seem like a strong relationship but this may show areas of aging residential streets or aging areas where things are reported. There is also the case of weathering of streets. Chicago is known as the "windy city" and weather can help create storm damage or freeze/thaw for potholes so these areas of Chicago may see similar patterns. This all suggests using potholes as a predictive variable.
+
+## Exercise 4.3: Nearest Neighbor Features
+
+```{r nn-feature}
+#| message: false
+
+# Calculate mean distance to 3 nearest potholes
+# (Do this OUTSIDE of mutate to avoid sf conflicts)
+
+# Get coordinates
+fishnet_coords <- st_coordinates(st_centroid(fishnet))
+potholes_coords <- st_coordinates(potholes_sf)
+
+# Check error for k nearest neighbor because coords have NA
+colSums(is.na(potholes_coords))
+colSums(is.na(fishnet_coords))
+
+#fix invalid rows for Potholes
+valid_rows <- complete.cases(potholes_coords)
+potholes_coords <- potholes_coords[valid_rows, , drop = FALSE]
+
+# Calculate k nearest neighbors and distances
+nn_result <- get.knnx(potholes_coords, fishnet_coords, k = 3)
+
+# Add to fishnet
+fishnet <- fishnet %>%
+  mutate(
+    potholes_sf.nn = rowMeans(nn_result$nn.dist)
+  )
+
+cat("✓ Calculated nearest neighbor distances\n")
+summary(fishnet$potholes_sf.nn)
+```
+
+**Question 4.2:** What does a low value of `potholes_sf.nn` mean? A high value? Why might this be informative?
+
+*Your answer here:* A low pothole.nn means that there is a lot of activity of reports so may be an area with more potholes or more disorder. Potholes would cluster with a low value. The high value would be the opposite where there are limited potholes or lower disorder. This would help see pothole activity at the neighborhood level.
+
+## Exercise 4.4: Distance to Hot Spots using Local Moran's I
+
+```{r local-morans-potholes}
+# Function to calculate Local Moran's I
+calculate_local_morans <- function(data, variable, k = 5) {
+  
+  # Create spatial weights
+  coords <- st_coordinates(st_centroid(data))
+  neighbors <- knn2nb(knearneigh(coords, k = k))
+  weights <- nb2listw(neighbors, style = "W", zero.policy = TRUE)
+  
+  # Calculate Local Moran's I
+  local_moran <- localmoran(data[[variable]], weights)
+  
+  # Classify clusters
+  mean_val <- mean(data[[variable]], na.rm = TRUE)
+  
+  data %>%
+    mutate(
+      local_i = local_moran[, 1],
+      p_value = local_moran[, 5],
+      is_significant = p_value < 0.05,
+      
+      moran_class = case_when(
+        !is_significant ~ "Not Significant",
+        local_i > 0 & .data[[variable]] > mean_val ~ "High-High",
+        local_i > 0 & .data[[variable]] <= mean_val ~ "Low-Low",
+        local_i < 0 & .data[[variable]] > mean_val ~ "High-Low",
+        local_i < 0 & .data[[variable]] <= mean_val ~ "Low-High",
+        TRUE ~ "Not Significant"
+      )
+    )
+}
+
+# Apply to Potholes
+fishnet <- calculate_local_morans(fishnet, "potholes_sf", k = 5)
+```
+
+```{r visualize-morans}
+#| fig-width: 8
+#| fig-height: 6
+
+# Visualize hot spots
+ggplot() +
+  geom_sf(
+    data = fishnet, 
+    aes(fill = moran_class), 
+    color = NA
+  ) +
+  scale_fill_manual(
+    values = c(
+      "High-High" = "#d7191c",
+      "High-Low" = "#fdae61",
+      "Low-High" = "#abd9e9",
+      "Low-Low" = "#2c7bb6",
+      "Not Significant" = "gray90"
+    ),
+    name = "Cluster Type"
+  ) +
+  labs(
+    title = "Local Moran's I: Potholes Clusters",
+    subtitle = "High-High = Hot spots of disorder"
+  ) +
+  theme_crime()
+```
+
+```{r distance-to-hotspots}
+# Get centroids of "High-High" cells (hot spots)
+hotspots <- fishnet %>%
+  filter(moran_class == "High-High") %>%
+  st_centroid()
+
+# Calculate distance from each cell to nearest hot spot
+if (nrow(hotspots) > 0) {
+  fishnet <- fishnet %>%
+    mutate(
+      dist_to_hotspot = as.numeric(
+        st_distance(st_centroid(fishnet), hotspots %>% st_union())
+      )
+    )
+  
+  cat("✓ Calculated distance to pothole hot spots\n")
+  cat("  - Number of hot spot cells:", nrow(hotspots), "\n")
+} else {
+  fishnet <- fishnet %>%
+    mutate(dist_to_hotspot = 0)
+  cat("⚠ No significant hot spots found\n")
+}
+```
+
+**Question 4.3:** Why might distance to a cluster of potholes be more informative than distance to a single pothole? What does Local Moran's I tell us?
+
+*Your answer here:* Distance to a cluster of potholes gives us broader patterns of disorderly infrastructure rather than misleading us to isolated events or since one event doesn't reflect neighborhood conditions. Clusters are real spatial patterns. The local moran's I tells us the spatial autocorrelation at the local level. Meaning it tells us statistically signification areas where potholes concentrate and tells us when the disorder is clustered, dispersed, or random. It gives us better chronic disorder understanding at the neighborhood level.
+
+::: callout-note
+**Local Moran's I** identifies:
+
+-   **High-High**: Hot spots (high values surrounded by high values)
+-   **Low-Low**: Cold spots (low values surrounded by low values)
+-   **High-Low / Low-High**: Spatial outliers
+
+This helps us understand spatial clustering patterns.
+:::
+
+------------------------------------------------------------------------
+
+# Part 5: Join Police Districts for Cross-Validation
+
+```{r join-districts}
+# Join district information to fishnet
+fishnet <- st_join(
+  fishnet,
+  policeDistricts,
+  join = st_within,
+  left = TRUE
+) %>%
+  filter(!is.na(District))  # Remove cells outside districts
+
+cat("✓ Joined police districts\n")
+cat("  - Districts:", length(unique(fishnet$District)), "\n")
+cat("  - Cells:", nrow(fishnet), "\n")
+```
+
+# Part 6: Model Fitting
+
+## Exercise 6.1: Poisson Regression
+
+```{r prepare-data}
+# Create clean modeling dataset
+fishnet_model <- fishnet %>%
+  st_drop_geometry() %>%
+  dplyr::select(
+    uniqueID,
+    District,
+    counttreedebris_sf,
+    potholes_sf,
+    potholes_sf.nn,
+    dist_to_hotspot
+  ) %>%
+  na.omit()  # Remove any remaining NAs
+
+cat("✓ Prepared modeling data\n")
+cat("  - Observations:", nrow(fishnet_model), "\n")
+cat("  - Variables:", ncol(fishnet_model), "\n")
+```
+
+```{r fit-poisson}
+# Fit Poisson regression
+model_poisson <- glm(
+  counttreedebris_sf ~ potholes_sf + potholes_sf.nn + 
+    dist_to_hotspot,
+  data = fishnet_model,
+  family = "poisson"
+)
+
+# Summary
+summary(model_poisson)
+```
+
+**Question 6.1:** Interpret the coefficients. Which variables are significant? What do the signs (positive/negative) tell you?
+
+*Your answer here:* All of the coefficients are highly significant. potholes_sf is showing that, because potholes counts are so large, that the broken windows theory we used is working that more potholes means more tree debris. The potholes_sf.nn is the strongest coefficient and is negative in contrast because it measures distance to a nearby pothole - as distance to be near a pothole increases the tree debris counts decrease thus the slope is negative. On the other hand, dist_to_hotspot is positive. Which is strange but it is because there are two distance measures that are related - potholes_sf.nn and dist_to_hotspot are collinear and thus dist_to_hotspot doesn't mean much here.
+
+## Exercise 6.2: Check for Overdispersion
+
+```{r check-overdispersion}
+# Calculate dispersion parameter
+dispersion <- sum(residuals(model_poisson, type = "pearson")^2) / 
+              model_poisson$df.residual
+
+cat("Dispersion parameter:", round(dispersion, 2), "\n")
+cat("Rule of thumb: >1.5 suggests overdispersion\n")
+
+if (dispersion > 1.5) {
+  cat("⚠ Overdispersion detected! Consider Negative Binomial model.\n")
+} else {
+  cat("✓ Dispersion looks okay for Poisson model.\n")
+}
+```
+
+## Exercise 6.3: Negative Binomial Regression
+
+```{r fit-negbin}
+# Fit Negative Binomial model
+model_nb <- glm.nb(
+  counttreedebris_sf ~ potholes_sf + potholes_sf.nn + 
+    dist_to_hotspot,
+  data = fishnet_model
+)
+
+# Summary
+summary(model_nb)
+
+# Compare AIC (lower is better)
+cat("\nModel Comparison:\n")
+cat("Poisson AIC:", round(AIC(model_poisson), 1), "\n")
+cat("Negative Binomial AIC:", round(AIC(model_nb), 1), "\n")
+```
+
+**Question 6.2:** Which model fits better (lower AIC)? What does this tell you about the data?
+
+*Your answer here:* The NB model has a way better AIC of 17256.8 than the Poisson of 89582.9. This shows the NB model, which dropped the potholes_sf count as non significant and reduced severity of dist_to_hotspot, is a better fit. Counts aren't helpful once distance is put in. Hotspot distance is just redundant. The NB model is showing that the only important predictor is proximity to potholes - the potholes_sf.nn variable.
+
+# Part 7: Spatial Cross-Validation
+
+**Leave-One-Group-Out (LOGO) Cross-Validation**
+
+```{r spatial-cv}
+# Get unique districts
+districts <- unique(fishnet_model$District)
+cv_results <- tibble()
+
+cat("Running LOGO Cross-Validation...\n")
+
+for (i in seq_along(districts)) {
+  
+  test_district <- districts[i]
+  
+  # Split data
+  train_data <- fishnet_model %>% filter(District != test_district)
+  test_data <- fishnet_model %>% filter(District == test_district)
+  
+  # Fit model on training data
+  model_cv <- glm.nb(
+    counttreedebris_sf ~ potholes_sf + potholes_sf.nn + 
+      dist_to_hotspot,
+    data = train_data
+  )
+  
+  # Predict on test data
+  test_data <- test_data %>%
+    mutate(
+      prediction = predict(model_cv, test_data, type = "response")
+    )
+  
+  # Calculate metrics
+  mae <- mean(abs(test_data$counttreedebris_sf - test_data$prediction))
+  rmse <- sqrt(mean((test_data$counttreedebris_sf - test_data$prediction)^2))
+  
+  # Store results
+  cv_results <- bind_rows(
+    cv_results,
+    tibble(
+      fold = i,
+      test_district = test_district,
+      n_test = nrow(test_data),
+      mae = mae,
+      rmse = rmse
+    )
+  )
+  
+  cat("  Fold", i, "/", length(districts), "- District", test_district, 
+      "- MAE:", round(mae, 2), "\n")
+}
+
+# Overall results
+cat("\n✓ Cross-Validation Complete\n")
+cat("Mean MAE:", round(mean(cv_results$mae), 2), "\n")
+cat("Mean RMSE:", round(mean(cv_results$rmse), 2), "\n")
+```
+
+```{r cv-results-table}
+# Show results
+cv_results %>%
+  arrange(desc(mae)) %>%
+  kable(
+    digits = 2,
+    caption = "LOGO CV Results by District"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Question 7.1:** Why is spatial CV more appropriate than random CV for this problem? Which districts were hardest to predict?
+
+*Your answer here:* The MAE values range from 102.85 to 29.31 and RSME values range from 136.53 to 34.82. These are large variations which is what spatial CV does better - it can show where the model generalizes well and where it doesn't. The models performance is a spatial problem by district - the relationship between tree debris and potholes isn't the same across the city. A random CV wouldn't capture this. Districts 22, 15, 1, 12 etc. were the hardest to predict.
+
+::: callout-note
+## Connection to Week 5
+
+Remember learning about train/test splits and cross-validation? This is a spatial version of that concept!
+
+**Why it matters:** If we can only predict well in areas we've already heavily policed, what does that tell us about the model's utility?
+:::
+
+# Part 8: Model Predictions and Comparison
+
+## Exercise 8.1: Generate Final Predictions
+
+```{r final-predictions}
+# Fit final model on all data
+final_model <- glm.nb(
+  counttreedebris_sf ~ potholes_sf + potholes_sf.nn + 
+    dist_to_hotspot,
+  data = fishnet_model
+)
+
+# Add predictions back to fishnet
+fishnet <- fishnet %>%
+  mutate(
+    prediction_nb = predict(final_model, fishnet_model, type = "response")[match(uniqueID, fishnet_model$uniqueID)]
+  )
+
+# Also add KDE predictions (normalize to same scale as counts)
+kde_sum <- sum(fishnet$kde_value, na.rm = TRUE)
+count_sum <- sum(fishnet$counttreedebris_sf, na.rm = TRUE)
+fishnet <- fishnet %>%
+  mutate(
+    prediction_kde = (kde_value / kde_sum) * count_sum
+  )
+```
+
+## Exercise 8.2: Compare Model vs. KDE Baseline
+
+```{r compare-models}
+#| fig-width: 12
+#| fig-height: 4
+
+# Create three maps
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = counttreedebris_sf), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Actual Tree Debris") +
+  theme_crime()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_nb), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Model Predictions (Neg. Binomial)") +
+  theme_crime()
+
+p3 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_kde), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "KDE Baseline Predictions") +
+  theme_crime()
+
+p1 + p2 + p3 +
+  plot_annotation(
+    title = "Actual vs. Predicted Tree Debris",
+    subtitle = "Does our complex model outperform simple KDE?"
+  )
+```
+
+```{r model-comparison-metrics}
+# Calculate performance metrics
+comparison <- fishnet %>%
+  st_drop_geometry() %>%
+  filter(!is.na(prediction_nb), !is.na(prediction_kde)) %>%
+  summarize(
+    model_mae = mean(abs(counttreedebris_sf - prediction_nb)),
+    model_rmse = sqrt(mean((counttreedebris_sf - prediction_nb)^2)),
+    kde_mae = mean(abs(counttreedebris_sf - prediction_kde)),
+    kde_rmse = sqrt(mean((counttreedebris_sf - prediction_kde)^2))
+  )
+
+comparison %>%
+  pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
+  separate(metric, into = c("approach", "metric"), sep = "_") %>%
+  pivot_wider(names_from = metric, values_from = value) %>%
+  kable(
+    digits = 2,
+    caption = "Model Performance Comparison"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+**Question 8.1:** Does the complex model outperform the simple KDE baseline? By how much? Is the added complexity worth it?
+
+*Your answer here:* The simple KDE outperformed the complex model by 15.86 MAE and 20.37 RMSE. The added complexity did not beat spatial smoothing - just added more explanatory variation. Tree debris is a spatial problem. The KDE baseline already captures the spatial pattern, spatial clustering, and neighborhood structure.
+
+## Exercise 9.3: Where Does the Model Work Well?
+
+```{r prediction-errors}
+#| fig-width: 10
+#| fig-height: 5
+
+# Calculate errors
+fishnet <- fishnet %>%
+  mutate(
+    error_nb = counttreedebris_sf - prediction_nb,
+    error_kde = counttreedebris_sf - prediction_kde,
+    abs_error_nb = abs(error_nb),
+    abs_error_kde = abs(error_kde)
+  )
+
+# Map errors
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = error_nb), color = NA) +
+  scale_fill_gradient2(
+    name = "Error",
+    low = "#2166ac", mid = "white", high = "#b2182b",
+    midpoint = 0,
+    limits = c(-10, 10)
+  ) +
+  labs(title = "Model Errors (Actual - Predicted)") +
+  theme_crime()
+
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = abs_error_nb), color = NA) +
+  scale_fill_viridis_c(name = "Abs. Error", option = "magma") +
+  labs(title = "Absolute Model Errors") +
+  theme_crime()
+
+p1 + p2
+```
+
+**Question 9.2:** Where does the model make the biggest errors? Are there spatial patterns in the errors? What might this reveal?
+
+*Your answer here:* Yes there are spatial patterns in the errors. The model makes the largest errors in the South and Southwest areas of Chicago. Also, a little bit in the Westside and Northside areas. The actual-predicted map shows underprediction in some of the districts and overprediciton in others, while the absolute error map shows neighborhoods where model performance is rather poor. There are other drivers that would happen with tree debris like I alluded to before such as tree canopy cover, land uses (industrial or commerical), storm intensity or exposure in certain areas over others, and just peoples reporting behaviors across neighborhoods that the model doesn't incorporate.
+
+# Part 10: Summary Statistics and Tables
+
+## Exercise 10.1: Model Summary Table
+
+```{r model-summary-table}
+# Create nice summary table
+model_summary <- broom::tidy(final_model, exponentiate = TRUE) %>%
+  mutate(
+    across(where(is.numeric), ~round(., 3))
+  )
+
+model_summary %>%
+  kable(
+    caption = "Final Negative Binomial Model Coefficients (Exponentiated)",
+    col.names = c("Variable", "Rate Ratio", "Std. Error", "Z", "P-Value")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  footnote(
+    general = "Rate ratios > 1 indicate positive association with tree debris counts."
+  )
+```
+
+## Exercise 10.2: Key Findings Summary
+
+**Technical Performance:**
+
+-   Cross-validation MAE: 54.5
+-   Model vs. KDE: KDE
+-   Most predictive variable: potholes_sf.nn
+
+**Spatial Patterns:**
+
+-   Tree debris reports are clustered.
+-   Hot spots are located in South and Southwest neighborhoods and a little bit in the Westsides and Northsides of Chicago.
+-   Model errors show patterns of clustering of underprediciton and overprediction with district boundaries.
+
+**Model Limitations:**
+
+-   Overdispersion: Yes, by a lot. We had to use the NB model.
+-   Spatial autocorrelation in residuals: Yes, the error maps show clustered residuals.
+-   Cells with zero counts: 12.9%
+
+# Conclusion and Next Steps
+
+This assignment has made a spatial prediction workflow for Chicago tree debris using 311 data and pothole as a predictor. While the Negative Binomial model identified strong relationships between disorder and tree debris, the spatial cross-validation and baseline comparison exercises demontrated that the KDE actually explains most of the variation anyway. Tree debris is strongly spatially autocorrelated, spatially clustered, and shaped by neighborhood(local)-level contextual factors that wern't in the model (like land use, storm exposure and intensities, and canopy cover). Future work should focus on incorporating tree canopy, storm data, other land use data.
