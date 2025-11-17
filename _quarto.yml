@@ -33,13 +33,14 @@ website:
           - href: Assignments/assignment_01/assignment1_template.qmd
             text: "Assignment 1: Census Data Exploration"
           - href: Assignments/assignment_02/assignment2_template.qmd
-            text: "Assignment 2: Spatial Analysis and Visualization "
+            text: "Assignment 2: Spatial Analysis and Visualization"
           - href: Assignments/MUSA-5080-Midterm/model_script.qmd
             text: "Midterm: Philadelphia Housing Price Prediction"
           - href: Assignments/MUSA-5080-Midterm/midterm_presentation.qmd
             text: "Midterm: Presentation"
           - href: Assignments/assignment_04/assignment4.qmd
-            text: "Assignment 4:Predictive Policing - Technical Implementation"
+            text: "Assignment 4: Predictive Policing - Technical Implementation"
+
 format:
   html:
     theme: cosmo
