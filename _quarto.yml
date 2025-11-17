@@ -37,9 +37,10 @@ website:
           - href: Assignments/MUSA-5080-Midterm/model_script.qmd
             text: "Midterm: Philadelphia Housing Price Prediction"
           - href: Assignments/MUSA-5080-Midterm/midterm_presentation.qmd
-            text: "Midterm: Presentation"
+            text: "Midterm: Presentation"          
           - href: Assignments/assignment_04/assignment4.qmd
             text: "Assignment 4: Predictive Policing - Technical Implementation"
+
 
 format:
   html:
