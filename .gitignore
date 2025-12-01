@@ -5,3 +5,13 @@ Assignments/assignment_04/data/*.csv
 
 /.quarto/
 **/*.quarto_ipynb
+Assignments/assignment_05/assignment_5.rmarkdown
+Assignments/MUSA-5080-Midterm/
+
+
+# R / Quarto caches
+*_cache/
+*_files/
+.Rproj.user/
+.Rhistory
+.RData

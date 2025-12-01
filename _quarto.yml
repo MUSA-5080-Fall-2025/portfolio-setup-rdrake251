@@ -40,6 +40,8 @@ website:
             text: "Midterm: Presentation"          
           - href: Assignments/assignment_04/assignment4.qmd
             text: "Assignment 4: Predictive Policing - Technical Implementation"
+          - href: Assignments/assignment_05/assignment_5.qmd
+            text: "Assignment 5: Space-Time Prediction of Bike Share Demand: Philadelphia Indego"
 
 
 format:
